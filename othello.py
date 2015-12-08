@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[43]:
+# In[36]:
 
 import numpy as np
 import Tkinter
@@ -9,7 +9,7 @@ import time
 import sys
 
 
-# In[44]:
+# In[37]:
 
 class Board:
     """
@@ -77,7 +77,7 @@ class Board:
                     count += 1
                 elif test == 2:
                     count -= 1
-        return [count, -count]
+        return count
     
     def getPosScore(self):
         """returns a score calculated based on the pre-defined positional matrix"""
@@ -89,7 +89,7 @@ class Board:
                     score += self.posScore[row][col]
                 elif test == 2:
                     score -= self.posScore[row][col]
-        return [score, -score]
+        return score
     
     def undo(self):
         """move back state to old (top of stack)"""
@@ -174,7 +174,7 @@ class Board:
         sys.stdout.flush()
 
 
-# In[45]:
+# In[38]:
 
 class GraphicsMgr:
     def __init__(self, othello):
@@ -325,7 +325,7 @@ class GraphicsMgr:
         self.top.update()
 
 
-# In[46]:
+# In[39]:
 
 class Othello:
     def __init__(self):
@@ -466,7 +466,7 @@ class Othello:
             
 
 
-# In[47]:
+# In[40]:
 
 import random
 class Player:
@@ -565,7 +565,7 @@ class Player:
         
 
 
-# In[48]:
+# In[41]:
 
 class MinMax():
     def __init__(self,board):
@@ -574,51 +574,89 @@ class MinMax():
         """
         self.board = board
         
-    def getBestMove(self, depth, color, moves, score_func):
+    def getBestMove(self, depth, current_color, moves, score_func):
         """Assuming there is at least one valid move in moves,
-        among them returns the best move that minimizes the maximum value 
-        that the opponent can be sure to obtain, given a score function.
+        among them returns the best move using minimax algorithm 
+        with alpha beta pruninggiven, given a score function
         """
+        # both starts with lowest possible scores
+        alpha = None # a value of best move found so far for MAX = -inf
+        beta = None  # a value of best move found so far for MIN = +inf
+        
         bestmove = None
-        minmaxval = None
-        opposite = (bool(color - 1) ^ bool(1)) + 1
+        maxply_color = (bool(current_color - 1) ^ bool(1)) + 1
         
         for move in moves:
-            self.board.updateBoard(move,color)
-            test = self.getMax(depth-1, opposite, opposite, 0, score_func)
+            # self.board.show()
+            if alpha is not None:
+                beta = -1 * alpha
             
-            if minmaxval == None or test < minmaxval:
-                minmaxval = test
+            self.board.updateBoard(move,current_color)
+            test = self.getBestMoveHelper(depth-1, maxply_color, 0, score_func, alpha, beta, maxply_color)
+            
+            if beta == None or test < beta:
+                beta = test
                 bestmove = move
             self.board.undo() # undo
+            
         return bestmove
     
-    def getMax(self, depth, opposite, current_color, nomovectr, score_func):
-        """returns a maximum score at the specified depth or the endgame
+    def getBestMoveHelper(self, depth, current_color, nomovectr, score_func, alpha, beta, maxply_color):
+        """returns a heuristic value at the specified depth or the endgame
         """
-        maxval = None
         next_color = (bool(current_color - 1) ^ bool(1)) + 1
         
-        # is game end or reaches the depth?
+        # if depth == 0 or a terminal node (game end)
+        # returns the heuristic value of node
         if nomovectr == 2 or depth == 0:
-            maxval = score_func()[opposite-1]
-            return maxval
+            score = score_func()
+            if maxply_color == 2:
+                score *= -1
+            #print "[L] ========"
+            #self.board.show()
+            #print "color: %d" % (current_color)
+            #print "[L] Score: %d" % (score)
+            return score
         
         # is there any possible movement for the player?
         moves = self.board.getValidMoves(current_color)
         
         if moves.size == 0:
-            maxval = self.getMax(depth-1, opposite, next_color, nomovectr+1, score_func)
+            return self.getBestMoveHelper(depth-1, next_color, nomovectr+1, score_func, alpha, beta, maxply_color)
         else:
             for move in moves:
+                # self.board.show()
                 self.board.updateBoard(move, current_color)
-                test = self.getMax(depth-1, opposite, next_color, 0, score_func)
-                if maxval == None or test > maxval:
-                    maxval = test
+                test = self.getBestMoveHelper(depth-1, next_color, 0, score_func, alpha, beta, maxply_color)
                 self.board.undo() # undo
+                
+                # maxplayer
+                if(maxply_color == current_color):
+                    if alpha == None or test > alpha:
+                        alpha = test
+                # minplayer
+                else:
+                    if beta == None or test < beta:
+                        beta = test
+                
+                #print "color: %d" % (current_color)
+                #print "s = %d" % (test)
+                #if alpha != None:
+                #    print "a = %d" % (alpha)
+                #if beta != None:
+                #    print "b = %d" % (beta)
+                
+                # pruning
+                if (alpha != None) and (beta != None) and beta <= alpha:
+                    # print "pruned!"
+                    break
+    
+        if(maxply_color == current_color):
+            return alpha
+        return beta
 
 
-# In[49]:
+# In[42]:
 
 othello = Othello()
 othello.start()
