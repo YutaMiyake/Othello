@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[36]:
+# In[15]:
 
 import numpy as np
 import Tkinter
@@ -9,7 +9,7 @@ import time
 import sys
 
 
-# In[37]:
+# In[16]:
 
 class Board:
     """
@@ -27,14 +27,14 @@ class Board:
     
     def init(self):
         self.board = [[0 for x in range(self.rows)] for x in range(self.rows)] 
-        self.posScore = [[50,-10 ,5  ,5  ,5  ,5 ,-10 ,50],
-                        [-10,-25 ,-3  ,-3  ,-3  ,-3  ,-25 ,-10],
-                        [5  ,-3   ,2  ,2  ,2  ,2  ,-3   ,5],
-                        [5  ,-3   ,2  ,2  ,2  ,2  ,-3   ,5],
-                        [5  ,-3   ,2  ,2  ,2  ,2  ,-3   ,5],
-                        [5  ,-3   ,2  ,2  ,2  ,2  ,-3   ,5],
-                        [-10,-25 ,-3  ,-3  ,-3  ,-3  ,-25 ,-10],
-                        [50 ,-10 ,5  ,5  ,5  ,5  ,-10 ,50]]
+        self.posScore = [[100,-25 ,10  ,10  ,10  ,10 ,-25 ,100],
+                        [-25,-50 ,-3  ,-3  ,-3  ,-3  ,-50 ,-25],
+                        [10  ,-3   ,3  ,2  ,2  ,2  ,-3   ,10],
+                        [10  ,-3   ,3  ,2  ,2  ,2  ,-3   ,10],
+                        [10  ,-3   ,3  ,2  ,2  ,2  ,-3   ,10],
+                        [10  ,-3   ,3  ,3  ,2  ,2  ,-3   ,10],
+                        [-25,-50 ,-3  ,-3  ,-3  ,-3  ,-50 ,-25],
+                        [100,-25 ,10  ,10  ,10  ,10 ,-25 ,100]]
         self.board[3][3] = 1
         self.board[4][4] = 1
         self.board[3][4] = 2
@@ -67,28 +67,39 @@ class Board:
                     w_score += 1
         return [b_score, w_score]
     
-    def getCountScore(self):
+    def getCountScore(self,color):
         """returns a simple score based on the number of each color"""
         count = 0
+        opposite = (bool(color - 1) ^ bool(1)) + 1 
         for row in range(self.rows):
             for col in range(self.rows):
                 test = self.board[row][col]
-                if test == 1:
+                if test == color:
                     count += 1
-                elif test == 2:
+                elif test == opposite:
                     count -= 1
         return count
     
-    def getPosScore(self):
+    def getPosScore(self,color):
         """returns a score calculated based on the pre-defined positional matrix"""
         score = 0
+        rest = 0
+        opposite = (bool(color - 1) ^ bool(1)) + 1 
         for row in range(self.rows):
             for col in range(self.rows):
                 test = self.board[row][col]
-                if test == 1:
+                if test == color:
                     score += self.posScore[row][col]
-                elif test == 2:
+                elif test == opposite:
                     score -= self.posScore[row][col]
+                else:
+                    rest += 1
+                    
+        # turn bonus
+        if score >= 0:
+            score += (128-rest*2)
+        else:
+            score -= (128-rest*2)
         return score
     
     def undo(self):
@@ -172,9 +183,23 @@ class Board:
                     print "|o",
             print "|" 
         sys.stdout.flush()
+        
+    def toStr(self):
+        """returns a board as string"""
+        result = ""
+        for row in range(self.rows):
+            for col in range(self.rows):
+                if self.board[row][col] == 0:
+                    result += "_"
+                elif self.board[row][col] == 1:
+                    result += "+"
+                else:
+                    result += "o"
+            result += "\n" 
+        return result
 
 
-# In[38]:
+# In[17]:
 
 class GraphicsMgr:
     def __init__(self, othello):
@@ -325,7 +350,7 @@ class GraphicsMgr:
         self.top.update()
 
 
-# In[39]:
+# In[18]:
 
 class Othello:
     def __init__(self):
@@ -433,7 +458,7 @@ class Othello:
             
             # no choce ?
             if(self.target.moves.size == 0):
-                player_turn = False
+                player_turn = False # skip the current player's turn
                 nomovectr += 1
                 # is game end?
                 if(nomovectr == 2):
@@ -466,7 +491,7 @@ class Othello:
             
 
 
-# In[40]:
+# In[19]:
 
 import random
 class Player:
@@ -495,10 +520,10 @@ class Player:
             self.moved = True
         else:
             self.moved = False
-        self.depth = 4
+        self.depth = 4 # n-ply lookahead
         
         self.board = board
-        self.minmax = MinMax(self.board)
+        self.minimax = MiniMax(self.board)
         
     def setCPULevel(self, level):
         self.cpuLevel = level
@@ -559,15 +584,15 @@ class Player:
         if self.level == 0:
             return self.randomPlay()
         elif self.level == 1:
-            return self.minmax.getBestMove(self.depth, self.color, self.moves, self.board.getCountScore)
-        else:      
-            return self.minmax.getBestMove(self.depth, self.color, self.moves, self.board.getPosScore)
+            return self.minimax.getBestMove(self.depth, self.color, self.moves, self.board.getCountScore)
+        else:   
+            return self.minimax.getBestMove(self.depth, self.color, self.moves, self.board.getPosScore)
         
 
 
-# In[41]:
+# In[20]:
 
-class MinMax():
+class MiniMax():
     def __init__(self,board):
         """
         board: Board obj
@@ -577,55 +602,49 @@ class MinMax():
     def getBestMove(self, depth, current_color, moves, score_func):
         """Assuming there is at least one valid move in moves,
         among them returns the best move using minimax algorithm 
-        with alpha beta pruninggiven, given a score function
+        with alpha beta pruning, given a score function
         """
+        
         # both starts with lowest possible scores
         alpha = None # a value of best move found so far for MAX = -inf
         beta = None  # a value of best move found so far for MIN = +inf
         
         bestmove = None
-        maxply_color = (bool(current_color - 1) ^ bool(1)) + 1
+        next_color = (bool(current_color - 1) ^ bool(1)) + 1
         
         for move in moves:
-            # self.board.show()
             if alpha is not None:
                 beta = -1 * alpha
             
             self.board.updateBoard(move,current_color)
-            test = self.getBestMoveHelper(depth-1, maxply_color, 0, score_func, alpha, beta, maxply_color)
+            test = self.getBestMoveHelper(depth-1, next_color, 0, score_func, alpha, beta, current_color)
             
-            if beta == None or test < beta:
-                beta = test
+            if alpha == None or test > alpha:
+                alpha = test
                 bestmove = move
             self.board.undo() # undo
-            
+        
         return bestmove
     
     def getBestMoveHelper(self, depth, current_color, nomovectr, score_func, alpha, beta, maxply_color):
-        """returns a heuristic value at the specified depth or the endgame
+        """returns a utility value at the specified depth or the endgame
         """
         next_color = (bool(current_color - 1) ^ bool(1)) + 1
         
         # if depth == 0 or a terminal node (game end)
         # returns the heuristic value of node
         if nomovectr == 2 or depth == 0:
-            score = score_func()
-            if maxply_color == 2:
-                score *= -1
-            #print "[L] ========"
-            #self.board.show()
-            #print "color: %d" % (current_color)
-            #print "[L] Score: %d" % (score)
+            score = score_func(maxply_color)
             return score
         
         # is there any possible movement for the player?
         moves = self.board.getValidMoves(current_color)
         
         if moves.size == 0:
-            return self.getBestMoveHelper(depth-1, next_color, nomovectr+1, score_func, alpha, beta, maxply_color)
+            score = self.getBestMoveHelper(depth-1, next_color, nomovectr+1, score_func, alpha, beta, maxply_color)
+            return score
         else:
             for move in moves:
-                # self.board.show()
                 self.board.updateBoard(move, current_color)
                 test = self.getBestMoveHelper(depth-1, next_color, 0, score_func, alpha, beta, maxply_color)
                 self.board.undo() # undo
@@ -639,27 +658,27 @@ class MinMax():
                     if beta == None or test < beta:
                         beta = test
                 
-                #print "color: %d" % (current_color)
-                #print "s = %d" % (test)
-                #if alpha != None:
-                #    print "a = %d" % (alpha)
-                #if beta != None:
-                #    print "b = %d" % (beta)
-                
                 # pruning
                 if (alpha != None) and (beta != None) and beta <= alpha:
-                    # print "pruned!"
                     break
-    
+            
         if(maxply_color == current_color):
-            return alpha
-        return beta
+            score = alpha
+        else:
+            score = beta
+        
+        return score
 
 
-# In[42]:
+# In[21]:
 
 othello = Othello()
 othello.start()
+
+
+# In[ ]:
+
+
 
 
 # In[ ]:
