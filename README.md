@@ -13,7 +13,10 @@ CPU has three levels. Level 1 plays randomly. Level 2 and 3 play under minimax s
 > python othello.py
 ```
 ## Screenshots
-![Alt main](./images/screenshot1.png?raw=true "main")
+![Alt testcase](./images/screenshot1.png?raw=true "testcase")
+
+## Minimax Tree
+![Alt minimaxtree](./graph_out/minimax_tree.png?raw=true "minimaxtree")
 
 ## Licence
 * MIT License
